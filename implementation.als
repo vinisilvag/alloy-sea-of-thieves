@@ -62,7 +62,6 @@ fact {
 
 	always all t : Tripulation | #t.pirates >= 1 and #t.pirates <= 4
 
-	always all t : Tripulation | lone tripulations.t
 	always all p : Pirate | one pirates.p
 }
 
@@ -157,7 +156,7 @@ pred System {
 -- Executions
 --------------
 
-run execution { System } for 3
+run execution { System } for 5
 
 --------------
 -- Properties

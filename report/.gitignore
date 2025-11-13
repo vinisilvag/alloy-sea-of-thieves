@@ -1,0 +1,30 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.xdv
+# editor/temp
+*~
+# Vim swap
+.swp
+# OS files
+.DS_Store
+Thumbs.db
+# build dirs
+build/
+latex.out
+*.lof
+*.lot
+*.gz
+*.bbl
+*.blg
+*.run.xml
+*.bcf
+
+*.vrb
