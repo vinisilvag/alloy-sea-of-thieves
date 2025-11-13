@@ -48,7 +48,7 @@ one sig SoTGame {
 
 -- Track operators during execution
 abstract sig Operator {}
-one sig TLon, TLout extends Operator {}
+one sig JT, LT, TLon, TLout extends Operator {}
 one sig Track {
   var op: lone Operator
 }
@@ -59,10 +59,6 @@ one sig Track {
 
 fact {
   always no s : Server | s not in SoTGame.servers
-
-  always all t : Tripulation | #t.pirates >= 1 and #t.pirates <= 4
-
-  always all p : Pirate | one pirates.p
 }
 
 --------------------
@@ -84,6 +80,23 @@ pred noTripulationsChange [Ss: set Server] {
 -------------
 -- Operators
 -------------
+
+pred joinTripulation [p: Pirate, t: Tripulation] {
+	-- pre-conditions
+	p not in Tripulation.pirates
+	no p.status
+	#t.pirates <= 3
+
+	-- post-conditions
+	t.pirates' = t.pirates + p
+
+	-- frame-conditions
+	noStatusChange[Pirate]
+	-- noPiratesChange[Tripulation - t]
+	noTripulationsChange[Server]
+
+	Track.op' = JT
+}
 
 pred tripulationLogon [s: Server, t: Tripulation] {
   -- pre-conditions
@@ -127,9 +140,11 @@ pred stutter [] {
 
 pred init [] {
   some SoTGame.servers
-  no Server.tripulations
-  -- no Ship.location
-  no Pirate.status
+	no tripulations
+	no pirates
+	no status
+
+	-- no location
 
   no Track.op
 }
@@ -138,8 +153,9 @@ pred init [] {
 -- Transition relation
 -----------------------
 
-pred trans []  {
-  (some s : Server | some t : Tripulation | tripulationLogon[s, t])
+pred transition []  {
+	(some p : Pirate | some t : Tripulation | joinTripulation[p, t])
+  -- (some s : Server | some t : Tripulation | tripulationLogon[s, t])
   -- or stutter
 }
 
@@ -149,7 +165,7 @@ pred trans []  {
 
 pred System {
   init
-  always trans
+  always transition
 }
 
 --------------
@@ -164,22 +180,10 @@ run execution { System } for 5
 
 pred p1 {}
 
-pred p2 {}
-
-pred p3 {}
-
-pred p4 {}
-
 --------------
 -- Assertions
 --------------
 
 assert a1 { System => p1 }
-assert a2 { System => p2 }
-assert a3 { System => p3 }
-assert a4 { System => p4 }
 
 check a1 for 8
-check a2 for 8
-check a3 for 8
-check a4 for 8
