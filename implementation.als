@@ -1,13 +1,13 @@
---===============================================
--- DCC831 Formal Methods
--- 2025.2
+-- ===============================================
+--  DCC831 Formal Methods
+--  2025.2
 --
--- Course Project -> Modeling the universe of
---	 								 Sea of Thieves in Alloy
+--  Course Project -> Modeling the universe of
+--                    Sea of Thieves in Alloy
 --
--- Name:  Vinicius Silva Gomes - 2021421869
+--  Name:  Vinicius Silva Gomes - 2021421869
 --
---===============================================
+-- ===============================================
 
 --------------
 -- Signatures
@@ -31,19 +31,19 @@ abstract sig PirateStatus {}
 one sig Dead, Alive, Otherworld extends PirateStatus {}
 
 sig Pirate {
-	var status: lone PirateStatus
+  var status: lone PirateStatus
 }
 
 sig Tripulation {
-	var pirates: set Pirate
+  var pirates: set Pirate
 }
 
 sig Server {
-	var tripulations: set Tripulation
+  var tripulations: set Tripulation
 }
 
 one sig SoTGame {
-	servers: set Server
+  servers: set Server
 }
 
 -- Track operators during execution
@@ -58,11 +58,11 @@ one sig Track {
 ---------
 
 fact {
-	always no s : Server | s not in SoTGame.servers
+  always no s : Server | s not in SoTGame.servers
 
-	always all t : Tripulation | #t.pirates >= 1 and #t.pirates <= 4
+  always all t : Tripulation | #t.pirates >= 1 and #t.pirates <= 4
 
-	always all p : Pirate | one pirates.p
+  always all p : Pirate | one pirates.p
 }
 
 --------------------
@@ -70,15 +70,15 @@ fact {
 --------------------
 
 pred noStatusChange [Ps: set Pirate] {
-	all p : Ps | p.status' = p.status
+  all p : Ps | p.status' = p.status
 }
 
 pred noPiratesChange [Ts: set Tripulation] {
-	all t : Ts | t.pirates' = t.pirates
+  all t : Ts | t.pirates' = t.pirates
 }
 
 pred noTripulationsChange [Ss: set Server] {
-	all s : Ss | s.tripulations' = s.tripulations
+  all s : Ss | s.tripulations' = s.tripulations
 }
 
 -------------
@@ -86,39 +86,39 @@ pred noTripulationsChange [Ss: set Server] {
 -------------
 
 pred tripulationLogon [s: Server, t: Tripulation] {
-	-- pre-conditions
-	t not in Server.tripulations
-	all p : t.pirates | no p.status
+  -- pre-conditions
+  t not in Server.tripulations
+  all p : t.pirates | no p.status
 
-	-- post-conditions
-	s.tripulations' = s.tripulations + t
-	all p : t.pirates | p.status' = Alive
+  -- post-conditions
+  s.tripulations' = s.tripulations + t
+  all p : t.pirates | p.status' = Alive
 	
-	-- frame-conditions
-	-- noTripulationsChange[Server - s]
-	-- noPiratesChange[Tripulation]
-	-- noStatusChange[Pirate - t.pirates]
+  -- frame-conditions
+  -- noTripulationsChange[Server - s]
+  -- noPiratesChange[Tripulation]
+  -- noStatusChange[Pirate - t.pirates]
 
-	Track.op' = TLon
+  Track.op' = TLon
 }
 
 pred tripulationLogout [s: Server, t: Tripulation] {
-	-- pre-conditions
-	t in Server.tripulations
-	-- post-conditions
-	s.tripulations' = s.tripulations - t
-	all p : t.pirates | no p.status'
-	-- frame-conditions
-	-- noTripulationsChange[Server - s]
-	-- noStatusChange[Pirate - t.pirates]
+  -- pre-conditions
+  t in Server.tripulations
+  -- post-conditions
+  s.tripulations' = s.tripulations - t
+  all p : t.pirates | no p.status'
+  -- frame-conditions
+  -- noTripulationsChange[Server - s]
+  -- noStatusChange[Pirate - t.pirates]
 
-	Track.op' = TLout
+  Track.op' = TLout
 }
 
 -- Stutter
 pred stutter [] {
-	noStatusChange[Pirate]
-	noTripulationsChange[Server]
+  noStatusChange[Pirate]
+  noTripulationsChange[Server]
 }
 
 -----------------
@@ -126,12 +126,12 @@ pred stutter [] {
 -----------------
 
 pred init [] {
-	some SoTGame.servers
-	no Server.tripulations
-	-- no Ship.location
-	no Pirate.status
+  some SoTGame.servers
+  no Server.tripulations
+  -- no Ship.location
+  no Pirate.status
 
-	no Track.op
+  no Track.op
 }
 
 -----------------------
@@ -139,8 +139,8 @@ pred init [] {
 -----------------------
 
 pred trans []  {
-	(some s : Server | some t : Tripulation | tripulationLogon[s, t])
-	-- or stutter
+  (some s : Server | some t : Tripulation | tripulationLogon[s, t])
+  -- or stutter
 }
 
 --------------------
