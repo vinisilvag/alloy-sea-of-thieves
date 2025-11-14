@@ -13,44 +13,45 @@
 -- Signatures
 --------------
 
--- abstract sig Location {}
+abstract sig Location {}
 
--- sig Ocean extends Location {}
--- abstract sig Island extends Location {}
--- abstract sig Outpost extends Location {}
+one sig Ocean extends Location {}
+abstract sig Island extends Location {}
+abstract sig Outpost extends Location {}
 
--- sig list_islands_subset extends Island {}
--- sig list_outposts_subset extends Outpost {}
+-- one sig list_islands_subset extends Island {}
+-- one sig list_outposts_subset extends Outpost {}
 
--- abstract sig Ship {
---   location: one Location
--- }
--- sig Sloop, Brigantine, Galleon extends Ship {}
+abstract sig Ship {
+	var shipLocation: lone Location
+}
+one sig Sloop, Brigantine, Galleon extends Ship {}
 
 abstract sig PirateStatus {}
 one sig Dead, Alive, Otherworld extends PirateStatus {}
 
 sig Pirate {
-  var status: lone PirateStatus
+	var status: lone PirateStatus
 }
 
 sig Tripulation {
-  var pirates: set Pirate
+	var pirates: set Pirate,
+	var ship: lone Ship
 }
 
 sig Server {
-  var tripulations: set Tripulation
+	var tripulations: set Tripulation
 }
 
 one sig SoTGame {
-  servers: set Server
+	servers: set Server
 }
 
 -- Track operators during execution
 abstract sig Operator {}
-one sig JT, LT, TLon, TLout extends Operator {}
+one sig NOP, JT, LT, TLogon, TLogout extends Operator {}
 one sig Track {
-  var op: lone Operator
+	var op: lone Operator
 }
 
 ---------
@@ -58,7 +59,9 @@ one sig Track {
 ---------
 
 fact {
-  always no s : Server | s not in SoTGame.servers
+	always no s : Server | s not in SoTGame.servers
+
+	-- Fato sobre o tamanho dos navios?
 }
 
 --------------------
@@ -66,16 +69,31 @@ fact {
 --------------------
 
 pred noStatusChange [Ps: set Pirate] {
-  all p : Ps | p.status' = p.status
+	all p : Ps | p.status' = p.status
 }
 
 pred noPiratesChange [Ts: set Tripulation] {
-  all t : Ts | t.pirates' = t.pirates
+	all t : Ts | t.pirates' = t.pirates
+}
+
+pred noShipChange [Ts: set Tripulation] {
+	all t : Ts | t.ship' = t.ship
+}
+
+pred noShipLocationChange [Ss: set Ship] {
+	all s : Ss | s.shipLocation' = s.shipLocation
 }
 
 pred noTripulationsChange [Ss: set Server] {
-  all s : Ss | s.tripulations' = s.tripulations
+	all s : Ss | s.tripulations' = s.tripulations
 }
+
+-----------------------
+-- Auxiliar predicates
+-----------------------
+
+-- Ver como fazer sobre os tamanhos de navio
+pred tripulationShip [t: Tripulation] {}
 
 -------------
 -- Operators
@@ -92,46 +110,86 @@ pred joinTripulation [p: Pirate, t: Tripulation] {
 
 	-- frame-conditions
 	noStatusChange[Pirate]
-	-- noPiratesChange[Tripulation - t]
+	noPiratesChange[Tripulation - t]
+	noShipChange[Tripulation]
+	noShipLocationChange[Ship]
 	noTripulationsChange[Server]
 
 	Track.op' = JT
 }
 
-pred tripulationLogon [s: Server, t: Tripulation] {
-  -- pre-conditions
-  t not in Server.tripulations
-  all p : t.pirates | no p.status
+pred leaveTripulation [p: Pirate, t: Tripulation] {
+	-- pre-conditions
+	p in t.pirates
+	#t.pirates - 1 > 0
 
-  -- post-conditions
-  s.tripulations' = s.tripulations + t
-  all p : t.pirates | p.status' = Alive
+	-- post-conditions
+	t.pirates' = t.pirates - p
+	no p.status
+
+	-- frame-conditions
+	noStatusChange[Pirate - p]
+	noPiratesChange[Tripulation - t]
+	noShipChange[Tripulation]
+	noShipLocationChange[Ship]
+	noTripulationsChange[Server]
+
+	Track.op' = LT
+}
+
+pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship] {
+	-- pre-conditions
+	t not in Server.tripulations
+	no t.ship
+	some t.pirates
+	all p : t.pirates | no p.status
+
+	-- post-conditions
+	sv.tripulations' = sv.tripulations + t
+	all p : t.pirates | p.status' = Alive
+	t.ship' = sp
+	-- t.ship.shipLocation' = l
 	
-  -- frame-conditions
-  -- noTripulationsChange[Server - s]
-  -- noPiratesChange[Tripulation]
-  -- noStatusChange[Pirate - t.pirates]
+	-- frame-conditions
+	noStatusChange[Pirate - t.pirates]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation - t]
+	noShipLocationChange[Ship]
+	noTripulationsChange[Server - sv]
 
-  Track.op' = TLon
+	Track.op' = TLogon
 }
 
 pred tripulationLogout [s: Server, t: Tripulation] {
-  -- pre-conditions
-  t in Server.tripulations
-  -- post-conditions
-  s.tripulations' = s.tripulations - t
-  all p : t.pirates | no p.status'
-  -- frame-conditions
-  -- noTripulationsChange[Server - s]
-  -- noStatusChange[Pirate - t.pirates]
+	-- pre-conditions
+	t in Server.tripulations
+	
+	-- post-conditions
+	no t.pirates
+	no t.ship
+	no t.ship.shipLocation
+	s.tripulations' = s.tripulations - t
+	all p : t.pirates | no p.status'
+	
+	-- frame-conditions
+	noStatusChange[Pirate - t.pirates]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation - t]
+	noShipLocationChange[Ship]
+	noTripulationsChange[Server - s]
 
-  Track.op' = TLout
+	Track.op' = TLogout
 }
 
 -- Stutter
 pred stutter [] {
-  noStatusChange[Pirate]
-  noTripulationsChange[Server]
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noShipLocationChange[Ship]
+	noTripulationsChange[Server]
+	
+	Track.op' = NOP
 }
 
 -----------------
@@ -139,14 +197,14 @@ pred stutter [] {
 -----------------
 
 pred init [] {
-  some SoTGame.servers
+	some SoTGame.servers
 	no tripulations
 	no pirates
 	no status
+	no ship
+	no shipLocation
 
-	-- no location
-
-  no Track.op
+	no Track.op
 }
 
 -----------------------
@@ -155,8 +213,10 @@ pred init [] {
 
 pred transition []  {
 	(some p : Pirate | some t : Tripulation | joinTripulation[p, t])
-  -- (some s : Server | some t : Tripulation | tripulationLogon[s, t])
-  -- or stutter
+	or (some p : Pirate | some t : Tripulation | leaveTripulation[p, t])
+	or (some sv : Server | some t : Tripulation | some sp : Ship | tripulationLogon[sv, t, sp])
+	or (some s : Server | some t : Tripulation | tripulationLogout[s, t])
+	or stutter
 }
 
 --------------------
@@ -164,15 +224,15 @@ pred transition []  {
 --------------------
 
 pred System {
-  init
-  always transition
+	init
+	always transition
 }
 
 --------------
 -- Executions
 --------------
 
-run execution { System } for 5
+run execution { System && some sv : Server | some t : Tripulation | some sp : Ship | eventually tripulationLogon[sv, t, sp] } for 5
 
 --------------
 -- Properties
