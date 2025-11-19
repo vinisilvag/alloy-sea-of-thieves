@@ -322,66 +322,21 @@ pred depart [t: Tripulation] {
 	Track.op' = DEP
 }
 
-pred collectTreasure [tp: Tripulation, ts: Treasure] {
-	-- pre-conditions
-	tp.location in Island
-	ts in tp.location.treasures
-	no tp.location.enemies
+pred killEnemie [] {}
 
-	-- post-conditions
-	tp.collectedTreasures' = tp.collectedTreasures + ts
-	tp.location.treasures' = tp.location.treasures - ts
+-- TODO again
+pred collectTreasure [tp: Tripulation, ts: Treasure] {}
 
-	-- frame-conditions
-	noStatusChange[Pirate]
-	noPiratesChange[Tripulation]
-	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
-	noTripulationsChange[Server]
-	noTreasuresChange[Island - tp.location]
-	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation - tp]
-	noHpChanges[Pirate]
-	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
-	noShipHpChange[Ship]
-
-	Track.op' = CT
-}
-
-pred sellTreasure [tp: Tripulation, ts: Treasure] {
-	-- pre-conditions
-	tp.location in Outpost
-	ts in tp.collectedTreasures
-
-	-- post-conditions
-	tp.collectedTreasures' = tp.collectedTreasures - ts
-	tp.money' = tp.money + 1
-
-	-- frame-conditions
-	noStatusChange[Pirate]
-	noPiratesChange[Tripulation]
-	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
-	noTripulationsChange[Server]
-	noTreasuresChange[Island]
-	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation - tp]
-	noHpChanges[Pirate]
-	noMoneyChanges[Tripulation - tp]
-	noResourcesChanges[Tripulation]
-	noShipHpChange[Ship]
-
-	Track.op' = ST
-}
+-- TODO again
+pred sellTreasure [tp: Tripulation, ts: Treasure] {}
 
 pred buyResources [] {}
+
+pred shipCollision [] {}
 
 pred useResources [] {}
 
 pred sinkShip [] {}
-
--- pred killEnemy [] {}
 
 -- How to model tripulation fights?
 
@@ -470,7 +425,7 @@ run exec3 { System && some sv : Server | some t : Tripulation | eventually tripu
 run exec4 { System && some t : Tripulation | some l : Location | eventually arrive[t, l] } for 5
 run exec5 { System && some t : Tripulation | eventually depart[t] } for 5
 
-run exec6 { System && some tp : Tripulation | some ts : Treasure | eventually collectTreasure[tp, ts] } for 5
+-- run exec6 { System && some tp : Tripulation | some ts : Treasure | eventually collectTreasure[tp, ts] } for 5
 -- run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
 
 --------------
