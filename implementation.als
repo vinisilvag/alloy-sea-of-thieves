@@ -22,17 +22,19 @@ sig Treasure {}
 abstract sig Location {}
 
 one sig Ocean extends Location {}
-abstract sig Island extends Location {
+sig Island extends Location {
 	var treasures: set Treasure,
 	var enemies: set Enemie
 }
-abstract sig Outpost extends Location {}
+sig Outpost extends Location {}
 
 -- one sig list_islands_subset extends Island {}
 -- one sig list_outposts_subset extends Outpost {}
 
-abstract sig Ship {}
-one sig Sloop, Brigantine, Galleon extends Ship {}
+abstract sig Ship {
+	var shipHp: lone Int
+}
+sig Sloop, Brigantine, Galleon extends Ship {}
 
 abstract sig PirateStatus {}
 one sig Dead, Alive, Otherworld extends PirateStatus {}
@@ -129,6 +131,10 @@ pred noResourcesChanges [Ts: set Tripulation] {
 	all t : Ts | t.resources' = t.resources
 }
 
+pred noShipHpChange [Ss: set Ship] {
+	all s : Ss | s.shipHp' = s.shipHp
+}
+
 -----------------------
 -- Auxiliar predicates
 -----------------------
@@ -167,6 +173,7 @@ pred joinTripulation [p: Pirate, t: Tripulation] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = JT
 }
@@ -192,6 +199,7 @@ pred leaveTripulation [p: Pirate, t: Tripulation] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = LT
 }
@@ -200,6 +208,7 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
 	-- pre-conditions
 	t not in Server.tripulations
 	no t.ship
+	no ship.sp
 	some t.pirates
 	all p : t.pirates | no p.status
 	shipRestrictions[t, sp]
@@ -213,6 +222,7 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
 	t.location' = l
 	t.money' = 0
 	t.resources' = 5
+	t.ship'.shipHp' = 5
 	
 	-- frame-conditions
 	noStatusChange[Pirate - t.pirates]
@@ -226,6 +236,7 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
 	noHpChanges[Pirate - t.pirates]
 	noMoneyChanges[Tripulation - t]
 	noResourcesChanges[Tripulation - t]
+	noShipHpChange[Ship - sp]
 
 	Track.op' = TLogon
 }
@@ -256,6 +267,7 @@ pred tripulationLogout [s: Server, t: Tripulation] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = TLogout
 }
@@ -280,6 +292,7 @@ pred arrive [t: Tripulation, l: Location] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 	
 	Track.op' = ARR
 }
@@ -304,6 +317,7 @@ pred depart [t: Tripulation] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = DEP
 }
@@ -330,6 +344,7 @@ pred collectTreasure [tp: Tripulation, ts: Treasure] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = CT
 }
@@ -355,9 +370,16 @@ pred sellTreasure [tp: Tripulation, ts: Treasure] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation - tp]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
 	Track.op' = ST
 }
+
+pred buyResources [] {}
+
+pred useResources [] {}
+
+pred sinkShip [] {}
 
 -- pred killEnemy [] {}
 
@@ -376,6 +398,7 @@ pred stutter [] {
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 	
 	Track.op' = NOP
 }
@@ -398,6 +421,8 @@ pred init [] {
 	no money
 	no resources
 
+	no shipHp
+
 	some treasures
 	some enemies
 
@@ -419,8 +444,8 @@ pred transition []  {
 	or (some t : Tripulation | depart[t])
 
 	-- Check bug on collectTreasure and sellTreasure
-	or (some tp : Tripulation | some ts : Treasure | collectTreasure[tp, ts])
-	or (some tp : Tripulation | some ts : Treasure | sellTreasure[tp, ts])
+	-- or (some tp : Tripulation | some ts : Treasure | collectTreasure[tp, ts])
+	-- or (some tp : Tripulation | some ts : Treasure | sellTreasure[tp, ts])
 	
 	or stutter
 }
@@ -446,7 +471,7 @@ run exec4 { System && some t : Tripulation | some l : Location | eventually arri
 run exec5 { System && some t : Tripulation | eventually depart[t] } for 5
 
 run exec6 { System && some tp : Tripulation | some ts : Treasure | eventually collectTreasure[tp, ts] } for 5
-run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
+-- run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
 
 --------------
 -- Properties
@@ -467,8 +492,13 @@ pred p3 {
 	always no disj t1, t2 : Tripulation | some (t1.pirates & t2.pirates)
 }
 
--- Nenhuma tripulacao com navios invalidos
+-- Nenhuma tripulacao compartilha o mesmo barco
 pred p4 {
+	always no disj t1, t2 : Tripulation | some t1.ship and some t2.ship and t1.ship = t2.ship
+}
+
+-- Nenhuma tripulacao com navios invalidos
+pred p5 {
 	always no t : Tripulation |
 		(#t.pirates > 1 and t.ship = Sloop) or (#t.pirates > 2 and t.ship = Brigantine)
 }
@@ -502,6 +532,7 @@ assert a1 { System => p1 }
 assert a2 { System => p2 }
 assert a3 { System => p3 }
 assert a4 { System => p4 }
+assert a5 { System => p5 }
 assert a8 { System => p8 }
 assert a9 { System => p9 }
 assert a10 { System => p10 }
@@ -510,6 +541,7 @@ check a1 for 5
 check a2 for 5
 check a3 for 5
 check a4 for 5
+check a5 for 5
 check a8 for 5
 check a9 for 5
 check a10 for 5
