@@ -15,7 +15,8 @@ open util/integer
 -- Signatures
 --------------
 
-sig Enemie {}
+sig Enemy {}
+-- one sig Kraken, Megalodon extends Enemy {}
 
 sig Treasure {}
 
@@ -24,7 +25,7 @@ abstract sig Location {}
 one sig Ocean extends Location {}
 sig Island extends Location {
 	var treasures: set Treasure,
-	var enemies: set Enemie
+	var enemies: set Enemy
 }
 sig Outpost extends Location {}
 
@@ -63,7 +64,7 @@ one sig SoTGame {
 
 -- Track operators during execution
 abstract sig Operator {}
-one sig NOP, JT, LT, TLogon, TLogout, ARR, DEP, CT, ST extends Operator {}
+one sig NOP, JT, LT, TLogon, TLogout, ARR, DEP, CT, ST, KE, ABE, EKP, FTD, R, FK, FM, BR, RS, SC, SS extends Operator {}
 one sig Track {
 	var op: lone Operator
 }
@@ -77,10 +78,10 @@ fact {
 	always no s : Server | s not in SoTGame.servers
 	
 	-- Islands do not share enemies
-	always all e : Enemie | one enemies.e
+	always no disj e1, e2 : Enemy | some (enemies.e1 & enemies.e2)
 
 	-- Islands do not share treasures
-	always all t : Treasure | one treasures.t
+	always no disj t1, t2 : Treasure | some (treasures.t1 & treasures.t2)
 }
 
 --------------------
@@ -185,7 +186,7 @@ pred leaveTripulation [p: Pirate, t: Tripulation] {
 
 	-- post-conditions
 	t.pirates' = t.pirates - p
-	no p.status
+	no p.status'
 
 	-- frame-conditions
 	noStatusChange[Pirate - p]
@@ -204,7 +205,7 @@ pred leaveTripulation [p: Pirate, t: Tripulation] {
 	Track.op' = LT
 }
 
-pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
+pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Outpost] {
 	-- pre-conditions
 	t not in Server.tripulations
 	no t.ship
@@ -212,7 +213,6 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
 	some t.pirates
 	all p : t.pirates | no p.status
 	shipRestrictions[t, sp]
-	l in Outpost
 
 	-- post-conditions
 	sv.tripulations' = sv.tripulations + t
@@ -221,8 +221,8 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Location] {
 	t.ship' = sp
 	t.location' = l
 	t.money' = 0
-	t.resources' = 5
-	t.ship'.shipHp' = 5
+	t.resources' = 3
+	t.ship'.shipHp' = 3
 	
 	-- frame-conditions
 	noStatusChange[Pirate - t.pirates]
@@ -322,23 +322,296 @@ pred depart [t: Tripulation] {
 	Track.op' = DEP
 }
 
-pred killEnemie [] {}
+pred killEnemy [i: Island, p: Pirate, e: Enemy] {
+	-- pre-conditions
+	p.status = Alive
+	e in i.enemies
+	(pirates.p).location = i
+	
+	-- post-conditions
+	i.enemies' = i.enemies - e
+	
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island - i]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
--- TODO again
-pred collectTreasure [tp: Tripulation, ts: Treasure] {}
+	Track.op' = KE
+}
 
--- TODO again
-pred sellTreasure [tp: Tripulation, ts: Treasure] {}
+pred attackedByEnemy [p: Pirate, e: Enemy] {
+	-- pre-conditions
+	p.status = Alive
+	p.hp > 1
+	((pirates.p).location = (enemies.e))
+	
+	-- post-conditions
+	p.hp' = minus[p.hp, 1]
+	
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate - p]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
-pred buyResources [] {}
+	Track.op' = ABE
+}
 
-pred shipCollision [] {}
+pred enemyKillPirate [p: Pirate, e: Enemy] {
+	-- pre-conditions
+	p.status = Alive
+	p.hp = 1
+	((pirates.p).location = (enemies.e))
+	
+	-- post-conditions
+	p.hp' = 0
+	p.status' = Dead
+	
+	-- frame-conditions
+	noStatusChange[Pirate - p]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate - p]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
-pred useResources [] {}
+	Track.op' = EKP
+}
 
-pred sinkShip [] {}
+pred ferryOfTheDamned [p: Pirate] {
+	-- pre-conditions
+	p.status = Dead
+	
+	-- post-conditions
+	p.status' = Otherworld
+	
+	-- frame-conditions
+	noStatusChange[Pirate - p]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
 
--- How to model tripulation fights?
+	Track.op' = FTD
+}
+
+pred respawn [p: Pirate] {
+	-- pre-conditions
+	p.status = Otherworld
+	
+	-- post-conditions
+	p.status' = Alive
+	p.hp' = 3
+	
+	-- frame-conditions
+	noStatusChange[Pirate - p]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate - p]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
+
+	Track.op' = R
+}
+
+pred collectTreasure [i: Island, tp: Tripulation, ts: Treasure] {
+	-- pre-conditions
+	tp.location = i
+	ts in i.treasures
+	no i.enemies
+	some p : tp.pirates | p.status = Alive
+	
+	-- post-conditions
+	tp.collectedTreasures' = tp.collectedTreasures + ts
+	i.treasures' = i.treasures - ts
+	
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island - i]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation - tp]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
+
+	Track.op' = CT
+}
+
+pred sellTreasure [tp: Tripulation, ts: Treasure] {
+	-- pre-conditions
+	tp.location in Outpost
+	ts in tp.collectedTreasures
+	
+	-- post-conditions
+	tp.collectedTreasures' = tp.collectedTreasures - ts
+	tp.money' = plus[tp.money, 1]
+	
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation - tp]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation - tp]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
+
+	Track.op' = ST
+}
+
+-- pred fightKraken [] {}
+
+-- pred fightMegalodon [] {}
+
+pred buyResources [tp: Tripulation] {
+	-- pre-conditions
+	tp.location in Outpost
+	tp.money >= 1
+	tp.resources < 3
+	
+	-- post-conditions
+	tp.money' = minus[tp.money, 1]
+	tp.resources' = plus[tp.resources, 1]
+
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation - tp]
+	noResourcesChanges[Tripulation - tp]
+	noShipHpChange[Ship]
+
+	Track.op' = BR
+}
+
+pred shipCollision [tp: Tripulation] {
+	-- pre-conditions
+	tp.location = Ocean
+	tp.ship.shipHp > 1
+	
+	-- post-conditions
+	tp.ship.shipHp' = minus[tp.ship.shipHp, 1]
+
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship - tp.ship]
+	
+	Track.op' = SC
+}
+
+pred repairShip [tp: Tripulation] {
+	-- pre-conditions
+	tp.ship.shipHp < 3
+	tp.resources >= 1
+	
+	-- post-conditions
+	tp.ship.shipHp' = plus[tp.ship.shipHp, 1]
+	tp.resources' = minus[tp.resources, 1]
+
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation - tp]
+	noShipHpChange[Ship - tp.ship]
+	
+	Track.op' = RS
+}
+
+pred sinkShip [tp: Tripulation] {
+	-- pre-conditions
+	tp.location = Ocean
+	tp.ship.shipHp = 1
+	
+	-- post-conditions
+	
+
+	-- frame-conditions
+	noStatusChange[Pirate]
+	noPiratesChange[Tripulation]
+	noShipChange[Tripulation]
+	noLocationChange[Tripulation]
+	noTripulationsChange[Server]
+	noTreasuresChange[Island]
+	noEnemiesChange[Island]
+	noCollectedTreasuresChange[Tripulation]
+	noHpChanges[Pirate]
+	noMoneyChanges[Tripulation]
+	noResourcesChanges[Tripulation]
+	noShipHpChange[Ship]
+	
+	Track.op' = SS
+}
+
+-- Model tripulation fights
 
 -- Stutter
 pred stutter [] {
@@ -392,16 +665,25 @@ pred transition []  {
 	   (some p : Pirate | some t : Tripulation | joinTripulation[p, t])
 	or (some p : Pirate | some t : Tripulation | leaveTripulation[p, t])
 	
-	or (some sv : Server | some t : Tripulation | some sp : Ship | some l : Location | tripulationLogon[sv, t, sp, l])
+	or (some sv : Server | some t : Tripulation | some sp : Ship | some l : Outpost | tripulationLogon[sv, t, sp, l])
 	or (some sv : Server | some t : Tripulation | tripulationLogout[sv, t])
 
 	or (some t : Tripulation | some l : Location | arrive[t, l])
 	or (some t : Tripulation | depart[t])
 
-	-- Check bug on collectTreasure and sellTreasure
-	-- or (some tp : Tripulation | some ts : Treasure | collectTreasure[tp, ts])
-	-- or (some tp : Tripulation | some ts : Treasure | sellTreasure[tp, ts])
+	or (some i : Island | some tp : Tripulation | some ts : Treasure | collectTreasure[i, tp, ts])
+	or (some tp : Tripulation | some ts : Treasure | sellTreasure[tp, ts])
 	
+	or (some i : Island | some p : Pirate | some e : Enemy | killEnemy[i, p, e])
+	or (some p : Pirate | some e : Enemy | attackedByEnemy [p, e])
+	or (some p : Pirate | some e : Enemy | enemyKillPirate [p, e])
+	or (some p : Pirate | ferryOfTheDamned [p])
+	or (some p : Pirate | respawn [p])
+
+	or (some tp : Tripulation | buyResources [tp])
+	or (some tp : Tripulation | shipCollision[tp])
+	or (some tp : Tripulation | repairShip[tp])
+
 	or stutter
 }
 
@@ -418,15 +700,24 @@ pred System {
 -- Executions
 --------------
 
-run exec { System && some sv : Server | some t : Tripulation | some sp : Ship | some l : Location | eventually tripulationLogon[sv, t, sp, l] } for 5
+run exec { System && some sv : Server | some t : Tripulation | some sp : Ship | some l : Outpost | eventually tripulationLogon[sv, t, sp, l] } for 5
 run exec2 { System && some p : Pirate | some t : Tripulation | eventually leaveTripulation[p, t] } for 5
 run exec3 { System && some sv : Server | some t : Tripulation | eventually tripulationLogout[sv, t] } for 5
 
 run exec4 { System && some t : Tripulation | some l : Location | eventually arrive[t, l] } for 5
 run exec5 { System && some t : Tripulation | eventually depart[t] } for 5
 
--- run exec6 { System && some tp : Tripulation | some ts : Treasure | eventually collectTreasure[tp, ts] } for 5
--- run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
+run exec6 { System && some i : Island | some tp : Tripulation | some ts : Treasure | eventually collectTreasure[i, tp, ts] } for 5
+run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
+
+run exec8 { System && some i : Island | some p : Pirate | some e : Enemy | eventually killEnemy[i, p, e] } for 5
+run exec9 { System && some p : Pirate | some e : Enemy | eventually attackedByEnemy[p, e] } for 5
+run exec10 { System && some p : Pirate | some e : Enemy | eventually enemyKillPirate[p, e] } for 5
+run exec11 { System && some p : Pirate | eventually respawn[p] } for 5
+
+run exec12 { System && some tp : Tripulation | eventually shipCollision[tp] } for 5
+run exec13 { System && some tp : Tripulation | eventually buyResources[tp] } for 15 steps
+run exec14 { System && some tp : Tripulation | eventually repairShip[tp] } for 15 steps
 
 --------------
 -- Properties
