@@ -16,8 +16,7 @@ open util/integer
 --------------
 
 abstract sig Enemy {}
-abstract sig LandEnemy {}
-abstract sig OceanEnemy {}
+abstract sig LandEnemy, OceanEnemy extends Enemy {}
 sig Skeleton, Phantom, OceanCrawler extends LandEnemy {}
 sig Kraken, Megalodon extends OceanEnemy {}
 
@@ -899,26 +898,28 @@ run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually se
 
 run exec8 { System && some i : Island | some p : Pirate | some le : LandEnemy | eventually killEnemy[i, p, le] } for 5
 run exec9 { System && some p : Pirate | some le : LandEnemy | eventually attackedByEnemy[p, le] } for 5
-run exec10 { System && some p : Pirate | eventually p.status = Dead } for 5
+run exec10 { System && some p : Pirate | some le : LandEnemy | eventually (attackedByEnemy[p, le] and after p.status = Dead) } for 5
 run exec11 { System && some p : Pirate | eventually respawn[p] } for 5
 
-run exec12 { System && some tp : Tripulation | eventually shipCollision[tp] } for 5
+run exec12 { System && some tp : Tripulation | eventually (shipCollision[tp] and after tp.ship.shipHp = 0) } for 5
 run exec13 { System && some tp : Tripulation | eventually buyResources[tp] } for 15 steps
 run exec14 { System && some tp : Tripulation | eventually repairShip[tp] } for 15 steps
 
-run exec15 { System && some tp : Tripulation | eventually fightKraken[tp] } for 5
-run exec16 { System && some tp : Tripulation | eventually fightMegalodon[tp] } for 5
+run exec15 { System && some tp : Tripulation | eventually (fightKraken[tp] and after tp.ship.shipHp = 0) } for 5
+run exec16 { System && some tp : Tripulation | eventually (fightMegalodon[tp] and after tp.ship.shipHp = 0) } for 5
 run exec18 { System && some tp : Tripulation | some o : Outpost | eventually shipRespawn[tp, o] } for 5
 
 run exec19 { System && some p : Pirate | eventually collectFood[p] } for 5
 run exec20 { System && some p : Pirate | eventually consumeFood[p] } for 5
 
--- run exec21 { System && some p1, p2 : Pirate | eventually pirateFight[p1, p2] } for 5
-run exec22 { System && some tp1, tp2 : Tripulation | eventually shipFight[tp1, tp2] } for 5
+run exec21 { System && some p1, p2 : Pirate | eventually (pirateFight[p1, p2] and after p2.status = Dead) } for 5
+run exec22 { System && some tp1, tp2 : Tripulation | eventually (shipFight[tp1, tp2] and after tp2.ship.shipHp = 0) } for 5
 
 --------------
 -- Properties
 --------------
+
+-- Safety properties
 
 -- Todos os servers estao vinculados a instancia do Game
 pred p1 {
@@ -966,6 +967,18 @@ pred p9 {
 pred p10 {
 	always no t : Tripulation, i : Island | some (t.collectedTreasures & i.treasures) 
 }
+
+-- Nenhum pirata tem 0 de hp e nao tem o status Dead
+
+-- Nenhum navio tem 0 de hp e possui localizacao ou algum tesouro coletado ou recurso
+
+-- Nenhum pirata tem vida negativa
+
+-- Nenhum navio tem vida negativa
+
+-- Fairness properties
+-- Todos os tesouros sao vendidos eventualmente 
+-- Todos os tesouros sao coletados eventualmente
 
 --------------
 -- Assertions
