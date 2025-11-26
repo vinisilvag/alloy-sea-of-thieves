@@ -16,17 +16,21 @@ open util/integer
 --------------
 
 abstract sig Enemy {}
-sig Skeleton, Phantom, OceanCrawler extends Enemy {}
-one sig Kraken, Megalodon extends Enemy {}
+abstract sig LandEnemy {}
+abstract sig OceanEnemy {}
+sig Skeleton, Phantom, OceanCrawler extends LandEnemy {}
+sig Kraken, Megalodon extends OceanEnemy {}
 
 sig Treasure {}
 
 abstract sig Location {}
 
-one sig Ocean extends Location {}
+one sig Ocean extends Location {
+	-- var oceanEnemies: set OceanEnemy
+}
 sig Island extends Location {
 	var treasures: set Treasure,
-	var enemies: set Enemy
+	var landEnemies: set LandEnemy
 }
 sig Outpost extends Location {}
 
@@ -78,14 +82,8 @@ one sig Track {
 ---------
 
 fact {
-	-- All servers are attached to SoTGame instance
+	-- All servers are attached to the SoTGame instance
 	always no s : Server | s not in SoTGame.servers
-	
-	-- Islands do not share enemies
-	always no disj e1, e2 : Enemy | some (enemies.e1 & enemies.e2)
-
-	-- Islands do not share treasures
-	always no disj t1, t2 : Treasure | some (treasures.t1 & treasures.t2)
 }
 
 --------------------
@@ -116,8 +114,8 @@ pred noTreasuresChange [Is: set Island] {
 	all i : Is | i.treasures' = i.treasures
 }
 
-pred noEnemiesChange [Is: set Island] {
-	all i : Is | i.enemies' = i.enemies
+pred noLandEnemiesChange [Is: set Island] {
+	all i : Is | i.landEnemies' = i.landEnemies
 }
 
 pred noCollectedTreasuresChange [Ts: set Tripulation] {
@@ -177,7 +175,7 @@ pred joinTripulation [p: Pirate, t: Tripulation] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -204,7 +202,7 @@ pred leaveTripulation [p: Pirate, t: Tripulation] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -242,7 +240,7 @@ pred tripulationLogon [sv: Server, t: Tripulation, sp: Ship, l : Outpost] {
 	noLocationChange[Tripulation - t]
 	noTripulationsChange[Server - sv]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate - t.pirates]
 	noMoneyChanges[Tripulation - t]
@@ -274,7 +272,7 @@ pred tripulationLogout [s: Server, t: Tripulation] {
 	noLocationChange[Tripulation - t]
 	noTripulationsChange[Server - s]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -301,7 +299,7 @@ pred arrive [t: Tripulation, l: Location] {
 	noLocationChange[Tripulation - t]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -328,7 +326,7 @@ pred depart [t: Tripulation] {
 	noLocationChange[Tripulation - t]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -339,14 +337,14 @@ pred depart [t: Tripulation] {
 	Track.op' = DEP
 }
 
-pred killEnemy [i: Island, p: Pirate, e: Enemy] {
+pred killEnemy [i: Island, p: Pirate, le: LandEnemy] {
 	-- pre-conditions
 	p.status = Alive
-	e in i.enemies
+	le in i.landEnemies
 	(pirates.p).location = i
 	
 	-- post-conditions
-	i.enemies' = i.enemies - e
+	i.landEnemies' = i.landEnemies - le
 	
 	-- frame-conditions
 	noStatusChange[Pirate]
@@ -355,7 +353,7 @@ pred killEnemy [i: Island, p: Pirate, e: Enemy] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island - i]
+	noLandEnemiesChange[Island - i]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -366,10 +364,10 @@ pred killEnemy [i: Island, p: Pirate, e: Enemy] {
 	Track.op' = KE
 }
 
-pred attackedByEnemy [p: Pirate, e: Enemy] {
+pred attackedByEnemy [p: Pirate, le: LandEnemy] {
 	-- pre-conditions
 	p.status = Alive
-	((pirates.p).location = (enemies.e))
+	((pirates.p).location = (landEnemies.le))
 	
 	-- post-conditions
 	p.hp' = minus[p.hp, 1]
@@ -381,7 +379,7 @@ pred attackedByEnemy [p: Pirate, e: Enemy] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate - p]
 	noMoneyChanges[Tripulation]
@@ -408,7 +406,7 @@ pred ferryOfTheDamned [p: Pirate] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -434,7 +432,7 @@ pred respawn [p: Pirate] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate - p]
 	noMoneyChanges[Tripulation]
@@ -449,7 +447,7 @@ pred collectTreasure [i: Island, tp: Tripulation, ts: Treasure] {
 	-- pre-conditions
 	tp.location = i
 	ts in i.treasures
-	no i.enemies
+	no i.landEnemies
 	some p : tp.pirates | p.status = Alive
 	
 	-- post-conditions
@@ -463,7 +461,7 @@ pred collectTreasure [i: Island, tp: Tripulation, ts: Treasure] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island - i]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation - tp]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -491,7 +489,7 @@ pred sellTreasure [tp: Tripulation, ts: Treasure] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation - tp]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation - tp]
@@ -519,7 +517,7 @@ pred collectFood [p: Pirate] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -547,7 +545,7 @@ pred consumeFood [p: Pirate] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate - p]
 	noMoneyChanges[Tripulation]
@@ -576,7 +574,7 @@ pred buyResources [tp: Tripulation] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation - tp]
@@ -603,7 +601,7 @@ pred shipCollision [tp: Tripulation] {
 	noShipChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
@@ -631,7 +629,7 @@ pred repairShip [tp: Tripulation] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -659,7 +657,7 @@ pred fightKraken [tp: Tripulation] {
 	noShipChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
@@ -688,7 +686,7 @@ pred fightMegalodon [tp: Tripulation] {
 	noShipChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
@@ -717,7 +715,7 @@ pred shipRespawn [tp: Tripulation, o: Outpost] {
 	noLocationChange[Tripulation - tp]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -747,7 +745,7 @@ pred pirateFight [p1: Pirate, p2: Pirate] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -778,7 +776,7 @@ pred shipFight [tp1: Tripulation, tp2: Tripulation] {
 	noShipChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
 	noShipHpChange[Ship - tp2.ship]
@@ -798,7 +796,7 @@ pred stutter [] {
 	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
-	noEnemiesChange[Island]
+	noLandEnemiesChange[Island]
 	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
@@ -831,7 +829,9 @@ pred init [] {
 	no shipHp
 
 	some treasures
-	some enemies
+	no disj i1, i2 : Island | some (i1.treasures & i2.treasures)
+	some landEnemies
+	no disj i1, i2 : Island | some (i1.landEnemies & i2.landEnemies)
 
 	no Track.op
 }
@@ -855,8 +855,8 @@ pred transition []  {
 	or (some p : Pirate | collectFood[p])
 	or (some p : Pirate | consumeFood[p])
 	
-	or (some i : Island | some p : Pirate | some e : Enemy | killEnemy[i, p, e])
-	or (some p : Pirate | some e : Enemy | attackedByEnemy [p, e])
+	or (some i : Island | some p : Pirate | some le : LandEnemy | killEnemy[i, p, le])
+	or (some p : Pirate | some le : LandEnemy | attackedByEnemy [p, le])
 	or (some p : Pirate | ferryOfTheDamned [p])
 	or (some p : Pirate | respawn [p])
 
@@ -897,8 +897,8 @@ run exec5 { System && some t : Tripulation | eventually depart[t] } for 5
 run exec6 { System && some i : Island | some tp : Tripulation | some ts : Treasure | eventually collectTreasure[i, tp, ts] } for 5
 run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually sellTreasure[tp, ts] } for 5
 
-run exec8 { System && some i : Island | some p : Pirate | some e : Enemy | eventually killEnemy[i, p, e] } for 5
-run exec9 { System && some p : Pirate | some e : Enemy | eventually attackedByEnemy[p, e] } for 5
+run exec8 { System && some i : Island | some p : Pirate | some le : LandEnemy | eventually killEnemy[i, p, le] } for 5
+run exec9 { System && some p : Pirate | some le : LandEnemy | eventually attackedByEnemy[p, le] } for 5
 run exec10 { System && some p : Pirate | eventually p.status = Dead } for 5
 run exec11 { System && some p : Pirate | eventually respawn[p] } for 5
 
