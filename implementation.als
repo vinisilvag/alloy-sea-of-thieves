@@ -68,7 +68,7 @@ one sig SoTGame {
 
 -- Track operators during execution
 abstract sig Operator {}
-one sig NOP, JT, LT, TLogon, TLogout, ARR, DEP, CT, ST, KE, ABE, EKP, FTD, R, FK, FM, BR, RS, SC, SS, SR, SF, PF, CollectF, ConsumeF extends Operator {}
+one sig NOP, JT, LT, TLogon, TLogout, ARR, DEP, CT, ST, KE, ABE, FTD, R, FK, FM, BR, RS, SC, SR, SF, PF, CollectF, ConsumeF extends Operator {}
 one sig Track {
 	var op: lone Operator
 }
@@ -369,14 +369,13 @@ pred killEnemy [i: Island, p: Pirate, e: Enemy] {
 pred attackedByEnemy [p: Pirate, e: Enemy] {
 	-- pre-conditions
 	p.status = Alive
-	p.hp > 1
 	((pirates.p).location = (enemies.e))
 	
 	-- post-conditions
 	p.hp' = minus[p.hp, 1]
+	minus[p.hp, 1] = 0 implies (p.food' = 0 and p.status' = Dead)
 	
 	-- frame-conditions
-	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
 	noLocationChange[Tripulation]
@@ -388,38 +387,11 @@ pred attackedByEnemy [p: Pirate, e: Enemy] {
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
 	noShipHpChange[Ship]
-	noFoodChange[Pirate]
+	minus[p.hp, 1] = 0
+		implies (noFoodChange[Pirate - p] and noStatusChange[Pirate - p])
+		else (noFoodChange[Pirate] and noStatusChange[Pirate])
 
 	Track.op' = ABE
-}
-
-pred enemyKillPirate [p: Pirate, e: Enemy] {
-	-- pre-conditions
-	p.status = Alive
-	p.hp = 1
-	((pirates.p).location = (enemies.e))
-	
-	-- post-conditions
-	p.hp' = 0
-	p.status' = Dead
-	p.food' = 0
-	
-	-- frame-conditions
-	noStatusChange[Pirate - p]
-	noPiratesChange[Tripulation]
-	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
-	noTripulationsChange[Server]
-	noTreasuresChange[Island]
-	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation]
-	noHpChanges[Pirate - p]
-	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
-	noShipHpChange[Ship]
-	noFoodChange[Pirate - p]
-
-	Track.op' = EKP
 }
 
 pred ferryOfTheDamned [p: Pirate] {
@@ -618,25 +590,27 @@ pred buyResources [tp: Tripulation] {
 pred shipCollision [tp: Tripulation] {
 	-- pre-conditions
 	tp.location = Ocean
-	tp.ship.shipHp > 1
+	tp.ship.shipHp >= 1
 	
 	-- post-conditions
 	tp.ship.shipHp' = minus[tp.ship.shipHp, 1]
+	minus[tp.ship.shipHp, 1] = 0
+		implies (no tp.location' and no tp.collectedTreasures' and no tp.resources')
 
 	-- frame-conditions
 	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
 	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
 	noFoodChange[Pirate]
+	minus[tp.ship.shipHp, 1] = 0
+		implies (noLocationChange[Tripulation - tp] and noCollectedTreasuresChange[Tripulation - tp] and noResourcesChanges[Tripulation - tp])
+		else (noLocationChange[Tripulation] and noCollectedTreasuresChange[Tripulation] and noResourcesChanges[Tripulation])
 	
 	Track.op' = SC
 }
@@ -670,85 +644,60 @@ pred repairShip [tp: Tripulation] {
 
 pred fightKraken [tp: Tripulation] {
 	-- pre-conditions
-	tp.ship.shipHp > 2
+	tp.ship.shipHp > 0
 	tp.location = Ocean
-	some tp.collectedTreasures
+	#tp.collectedTreasures >= 2
 	
 	-- post-conditions
-	tp.ship.shipHp' = minus[tp.ship.shipHp, 2]
+	minus[tp.ship.shipHp, 2] <= 0
+		implies (tp.ship.shipHp' = 0 and no tp.location' and no tp.collectedTreasures' and no tp.resources')
+		else tp.ship.shipHp' = minus[tp.ship.shipHp, 2]
 
 	-- frame-conditions
 	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
 	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
 	noFoodChange[Pirate]
+	minus[tp.ship.shipHp, 2] <= 0
+		implies (noLocationChange[Tripulation - tp] and noCollectedTreasuresChange[Tripulation - tp] and noResourcesChanges[Tripulation - tp])
+		else (noLocationChange[Tripulation] and noCollectedTreasuresChange[Tripulation] and noResourcesChanges[Tripulation])
 	
 	Track.op' = FK
 }
 
 pred fightMegalodon [tp: Tripulation] {
 	-- pre-conditions
-	tp.ship.shipHp > 1
+	tp.ship.shipHp >= 1
 	tp.location = Ocean
 	some tp.collectedTreasures
 	
 	-- post-conditions
 	tp.ship.shipHp' = minus[tp.ship.shipHp, 1]
+	minus[tp.ship.shipHp, 1] = 0
+		implies (no tp.location' and no tp.collectedTreasures' and no tp.resources')
 
 	-- frame-conditions
 	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
 	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
 	noShipHpChange[Ship - tp.ship]
 	noFoodChange[Pirate]
+	minus[tp.ship.shipHp, 1] = 0
+		implies (noLocationChange[Tripulation - tp] and noCollectedTreasuresChange[Tripulation - tp] and noResourcesChanges[Tripulation - tp])
+		else (noLocationChange[Tripulation] and noCollectedTreasuresChange[Tripulation] and noResourcesChanges[Tripulation])
 	
 	Track.op' = FM
-}
-
-pred sinkShip [tp: Tripulation] {
-	-- pre-conditions
-	tp.location = Ocean
-	tp.ship.shipHp = 1
-	
-	-- post-conditions
-	no tp.location'
-	no tp.collectedTreasures'
-	no tp.resources'
-	tp.ship.shipHp' = 0
-
-	-- frame-conditions
-	noStatusChange[Pirate]
-	noPiratesChange[Tripulation]
-	noShipChange[Tripulation]
-	noLocationChange[Tripulation - tp]
-	noTripulationsChange[Server]
-	noTreasuresChange[Island]
-	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation - tp]
-	noHpChanges[Pirate]
-	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation - tp]
-	noShipHpChange[Ship - tp.ship]
-	noFoodChange[Pirate]
-	
-	Track.op' = SS
 }
 
 pred shipRespawn [tp: Tripulation, o: Outpost] {
@@ -781,14 +730,18 @@ pred shipRespawn [tp: Tripulation, o: Outpost] {
 
 pred pirateFight [p1: Pirate, p2: Pirate] {
 	-- pre-conditions
+	p1.status = Alive
+	p2.status = Alive
 	(pirates.p1).location in Island
 	(pirates.p2).location in Island
 	(pirates.p1).location = (pirates.p2).location
+	p1 != p2
 	
 	-- post-conditions
+	p2.hp' = minus[p2.hp, 1]
+	minus[p2.hp, 1] = 0 implies (p2.food' = 0 and p2.status' = Dead)
 
 	-- frame-conditions
-	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
 	noLocationChange[Tripulation]
@@ -800,7 +753,9 @@ pred pirateFight [p1: Pirate, p2: Pirate] {
 	noMoneyChanges[Tripulation]
 	noResourcesChanges[Tripulation]
 	noShipHpChange[Ship]
-	noFoodChange[Pirate]
+	minus[p2.hp, 1] = 0
+		implies (noFoodChange[Pirate - p2] and noStatusChange[Pirate - p2])
+		else (noFoodChange[Pirate] and noStatusChange[Pirate])
 	
 	Track.op' = PF
 }
@@ -809,23 +764,28 @@ pred shipFight [tp1: Tripulation, tp2: Tripulation] {
 	-- pre-conditions
 	tp1.location = Ocean
 	tp2.location = Ocean
+	some p : tp1.pirates | p.status = Alive
+	tp1 != tp2
 	
 	-- post-conditions
-
+	tp2.ship.shipHp' = minus[tp2.ship.shipHp, 1]
+	minus[tp2.ship.shipHp, 1] = 0
+		implies (no tp2.location' and no tp2.collectedTreasures' and no tp2.resources')
+	
 	-- frame-conditions
 	noStatusChange[Pirate]
 	noPiratesChange[Tripulation]
 	noShipChange[Tripulation]
-	noLocationChange[Tripulation]
 	noTripulationsChange[Server]
 	noTreasuresChange[Island]
 	noEnemiesChange[Island]
-	noCollectedTreasuresChange[Tripulation]
 	noHpChanges[Pirate]
 	noMoneyChanges[Tripulation]
-	noResourcesChanges[Tripulation]
-	noShipHpChange[Ship]
+	noShipHpChange[Ship - tp2.ship]
 	noFoodChange[Pirate]
+	minus[tp2.ship.shipHp, 1] = 0
+		implies (noLocationChange[Tripulation - tp2] and noCollectedTreasuresChange[Tripulation - tp2] and noResourcesChanges[Tripulation - tp2])
+		else (noLocationChange[Tripulation] and noCollectedTreasuresChange[Tripulation] and noResourcesChanges[Tripulation])
 	
 	Track.op' = SF
 }
@@ -897,7 +857,6 @@ pred transition []  {
 	
 	or (some i : Island | some p : Pirate | some e : Enemy | killEnemy[i, p, e])
 	or (some p : Pirate | some e : Enemy | attackedByEnemy [p, e])
-	or (some p : Pirate | some e : Enemy | enemyKillPirate [p, e])
 	or (some p : Pirate | ferryOfTheDamned [p])
 	or (some p : Pirate | respawn [p])
 
@@ -907,8 +866,10 @@ pred transition []  {
 
 	or (some tp : Tripulation | fightKraken[tp])
 	or (some tp : Tripulation | fightMegalodon[tp])
-	or (some tp : Tripulation | sinkShip[tp])
 	or (some tp : Tripulation | some o : Outpost | shipRespawn[tp, o])
+
+	or (some p1, p2 : Pirate | pirateFight[p1, p2])
+	or (some tp1, tp2 : Tripulation | shipFight[tp1, tp2])
 
 	or stutter
 }
@@ -938,7 +899,7 @@ run exec7 { System && some tp : Tripulation | some ts : Treasure | eventually se
 
 run exec8 { System && some i : Island | some p : Pirate | some e : Enemy | eventually killEnemy[i, p, e] } for 5
 run exec9 { System && some p : Pirate | some e : Enemy | eventually attackedByEnemy[p, e] } for 5
-run exec10 { System && some p : Pirate | some e : Enemy | eventually enemyKillPirate[p, e] } for 5
+run exec10 { System && some p : Pirate | eventually p.status = Dead } for 5
 run exec11 { System && some p : Pirate | eventually respawn[p] } for 5
 
 run exec12 { System && some tp : Tripulation | eventually shipCollision[tp] } for 5
@@ -947,11 +908,13 @@ run exec14 { System && some tp : Tripulation | eventually repairShip[tp] } for 1
 
 run exec15 { System && some tp : Tripulation | eventually fightKraken[tp] } for 5
 run exec16 { System && some tp : Tripulation | eventually fightMegalodon[tp] } for 5
-run exec17 { System && some tp : Tripulation | eventually sinkShip[tp] } for 5
 run exec18 { System && some tp : Tripulation | some o : Outpost | eventually shipRespawn[tp, o] } for 5
 
 run exec19 { System && some p : Pirate | eventually collectFood[p] } for 5
 run exec20 { System && some p : Pirate | eventually consumeFood[p] } for 5
+
+-- run exec21 { System && some p1, p2 : Pirate | eventually pirateFight[p1, p2] } for 5
+run exec22 { System && some tp1, tp2 : Tripulation | eventually shipFight[tp1, tp2] } for 5
 
 --------------
 -- Properties
